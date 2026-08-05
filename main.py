@@ -6,6 +6,8 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from schemas import PostCreate, PostResponse
+
 app = FastAPI()
 app.mount("/static", StaticFiles(directory="static"), name="static")
 BASE_DIR = Path(__file__).resolve().parent
@@ -26,10 +28,10 @@ posts: list[dict] = [
         "title": "Python is Great for Web Development",
         "content": "Python is a great language for web development, and FastAPI makes it even better.",
         "date_posted": "April 21, 2025",
-    },
+    }
 ]
 
-@app.get("/")
+@app.get("/", include_in_schema=False)
 def home(request: Request):
     return templates.TemplateResponse(request, "home.html", 
                                       {
@@ -37,12 +39,7 @@ def home(request: Request):
                                           "title": "Home"
                                        })
 
-@app.get("/api/posts")
-def get_posts():
-    return {"data": posts}
-
-
-@app.get("/posts/{post_id}")
+@app.get("/posts/{post_id}", include_in_schema=False)
 def get_postpage(request: Request, post_id: int):
     post = next((post for post in posts if post["id"] == post_id), None)
     if post is None:
@@ -57,7 +54,12 @@ def get_postpage(request: Request, post_id: int):
                                               "title": title
                                            })
 
-@app.get("/api/posts/{post_id}")
+
+@app.get("/api/posts", response_model=list[PostResponse])
+def get_posts():
+    return posts
+
+@app.get("/api/posts/{post_id}", response_model=PostResponse)
 def get_post(post_id: int):
     post = next((post for post in posts if post["id"] == post_id), None)
     if post is None:
@@ -66,6 +68,24 @@ def get_post(post_id: int):
             detail="Post not found"
             )
     return {"data": post}
+
+## Create Post
+@app.post(
+    "/api/posts",
+    response_model=PostResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_post(post: PostCreate):
+    new_id = max(p["id"] for p in posts) + 1 if posts else 1
+    new_post = {
+        "id": new_id,
+        "author": post.author,
+        "title": post.title,
+        "content": post.content,
+        "date_posted": "April 23, 2025",
+    }
+    posts.append(new_post)
+    return new_post
 
 ## StarletteHTTPException Handler
 @app.exception_handler(StarletteHTTPException)
