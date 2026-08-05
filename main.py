@@ -67,7 +67,7 @@ def get_post(post_id: int):
             status_code=status.HTTP_404_NOT_FOUND, 
             detail="Post not found"
             )
-    return {"data": post}
+    return post
 
 ## Create Post
 @app.post(
