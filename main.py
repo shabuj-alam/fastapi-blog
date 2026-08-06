@@ -73,6 +73,37 @@ def users_post_page(request: Request, user_id: int, db: Annotated[Session, Depen
     )
 
 ##USER API
+@app.post("/api/users", response_model=UserResponse, status_code=status.HTTP_201_CREATED,)
+def create_user(user: UserCreate, db: Annotated[Session, Depends(get_db)]):
+    result = db.execute(Select(models.User).where(models.User.username == user.username))
+    existing_user = result.scalar_one_or_none()
+
+    if existing_user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Username already exists",
+        )
+
+    result = db.execute(Select(models.User).where(models.User.email == user.email))
+    existing_email = result.scalar_one_or_none()
+
+    if existing_email:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Email already exists",
+        )
+
+    new_user = models.User(
+        username=user.username,
+        email=user.email,
+    )
+
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+
+    return new_user
+
 @app.get("/api/users/{user_id}", response_model=UserResponse)
 def get_user(user_id: int, db: Annotated[Session, Depends(get_db)]):
     result = db.execute(Select(models.User).where(models.User.id == user_id))
@@ -120,7 +151,6 @@ def update_user(user_id: int, user_data: UserUpdate, db: Annotated[Session, Depe
     db.refresh(user)
     return user
 
-
 @app.get("/api/users/{user_id}/posts", response_model=list[PostResponse])
 def get_user_posts(user_id: int, db: Annotated[Session, Depends(get_db)]):
     result = db.execute(Select(models.User).where(models.User.id == user_id))
@@ -135,37 +165,18 @@ def get_user_posts(user_id: int, db: Annotated[Session, Depends(get_db)]):
     posts = result.scalars().all()
     return posts
 
-@app.post("/api/users", response_model=UserResponse, status_code=status.HTTP_201_CREATED,)
-def create_user(user: UserCreate, db: Annotated[Session, Depends(get_db)]):
-    result = db.execute(Select(models.User).where(models.User.username == user.username))
-    existing_user = result.scalar_one_or_none()
-
-    if existing_user:
+@app.delete("/api/user/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_user(user_id: int, db: Annotated[Session, Depends(get_db)]):
+    result = db.execute(Select(models.User).where(models.User.id == user_id))
+    user = result.scalar_one_or_none()
+    if user is None:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Username already exists",
-        )
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail="User not found"
+            )
 
-    result = db.execute(Select(models.User).where(models.User.email == user.email))
-    existing_email = result.scalar_one_or_none()
-
-    if existing_email:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Email already exists",
-        )
-
-    new_user = models.User(
-        username=user.username,
-        email=user.email,
-    )
-
-    db.add(new_user)
+    db.delete(user)
     db.commit()
-    db.refresh(new_user)
-
-    return new_user
-
 
 ##POST API
 @app.get("/api/posts", response_model=list[PostResponse])

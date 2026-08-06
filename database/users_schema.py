@@ -9,8 +9,8 @@ class UserCreate(UserBase):
     pass
 
 class UserUpdate(BaseModel):
-    username: str | None = Field(default=None, min_length=1, max_length=50)
-    email: EmailStr | None = Field(default=None, min_length=1, max_length=100)
+    username: str = Field(default=None, min_length=1, max_length=50)
+    email: EmailStr = Field(default=None, min_length=1, max_length=100)
     image_file: str | None = Field(default=None, min_length=1, max_length=100)
 
 class UserResponse(UserBase):
