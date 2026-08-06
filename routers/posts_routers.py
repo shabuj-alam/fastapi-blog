@@ -23,7 +23,7 @@ from database.posts_schema import (
 
 router = APIRouter()
 
-##POST API
+
 @router.get("", response_model=list[PostResponse])
 async def get_posts(db: Annotated[AsyncSession, Depends(get_db)]):
     result = await db.execute(
