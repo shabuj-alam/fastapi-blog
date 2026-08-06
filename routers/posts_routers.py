@@ -126,7 +126,10 @@ async def create_post(post: PostCreate, db: Annotated[AsyncSession, Depends(get_
 
 @router.delete("/{post_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_post(post_id: int, db: Annotated[AsyncSession, Depends(get_db)]):
-    result = await db.execute(Select(models.Post).where(models.Post.id == post_id))
+    result = await db.execute(
+        Select(models.Post)
+        .where(models.Post.id == post_id)
+    )
     post = result.scalar_one_or_none()
     if post is None:
         raise HTTPException(
@@ -134,7 +137,5 @@ async def delete_post(post_id: int, db: Annotated[AsyncSession, Depends(get_db)]
             detail="Post not found"
             )
 
-    db.delete(post)
+    await db.delete(post)
     await db.commit()
-
-    return post
