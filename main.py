@@ -230,7 +230,11 @@ async def delete_user(user_id: int, db: Annotated[AsyncSession, Depends(get_db)]
 ##POST API
 @app.get("/api/posts", response_model=list[PostResponse])
 async def get_posts(db: Annotated[AsyncSession, Depends(get_db)]):
-    result = await db.execute(Select(models.Post).order_by(models.Post.date_posted.desc()))
+    result = await db.execute(
+        Select(models.Post)
+        .options(selectinload(models.Post.author))
+        .order_by(models.Post.date_posted.desc())
+        )
     posts = result.scalars().all()
     return posts
 
@@ -344,7 +348,7 @@ async def delete_post(post_id: int, db: Annotated[AsyncSession, Depends(get_db)]
 async def general_http_exception_handler(request: Request, exception: StarletteHTTPException):
 
     if request.url.path.startswith("/api"):
-            return http_exception_handler(request, exception)
+            return await http_exception_handler(request, exception)
 
     message = (
         exception.detail
@@ -367,7 +371,7 @@ async def general_http_exception_handler(request: Request, exception: StarletteH
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exception: RequestValidationError):
     if request.url.path.startswith("/api"):
-        return request_validation_exception_handler(request, exception)
+        return await request_validation_exception_handler(request, exception)
     return templates.TemplateResponse(
         request,
         "error.html",
