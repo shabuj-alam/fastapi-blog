@@ -54,8 +54,8 @@ app.mount("/media", StaticFiles(directory="media"), name="media")
 BASE_DIR = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=BASE_DIR / "templates")
 
-app.include_router(users_routers.router, prefix="/api/users", tags=["Users"])
-app.include_router(posts_routers.router, prefix="/api/posts", tags=["Posts"])
+app.include_router(users_routers.router, prefix="/api/users", tags=["users"])
+app.include_router(posts_routers.router, prefix="/api/posts", tags=["posts"])
 
 #APP
 @app.get("/", include_in_schema=False, name="home")
