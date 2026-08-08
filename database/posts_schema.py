@@ -2,7 +2,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field, ConfigDict
 
-from database.users_schema import UserResponse
+from database.users_schema import UserPublic
 
 class PostBase(BaseModel):
     title: str = Field(min_length=1, max_length=100)
@@ -21,4 +21,4 @@ class PostResponse(PostBase):
     id: int
     user_id: int
     date_posted: datetime
-    author: UserResponse
+    author: UserPublic
