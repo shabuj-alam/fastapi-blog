@@ -20,6 +20,7 @@ from database.posts_schema import (
     PostResponse, 
     PostUpdate
 )
+from auth.auth import CurrentUser
 
 router = APIRouter()
 
@@ -49,10 +50,26 @@ async def get_post(post_id: int, db: Annotated[AsyncSession, Depends(get_db)]):
             )
     return post
 
+@router.post("", response_model=PostResponse, status_code=status.HTTP_201_CREATED)
+async def create_post(post: PostCreate, current_user: CurrentUser,db: Annotated[AsyncSession, Depends(get_db)]):
+
+    new_post = models.Post(
+        title=post.title,
+        content=post.content,
+        user_id=current_user.id
+    )
+
+    db.add(new_post)
+    await db.commit()
+    await db.refresh(new_post, attribute_names=["author"])
+
+    return new_post
+
 @router.put("/{post_id}", response_model=PostResponse)
 async def update_full_post(
     post_id: int, 
     post_data: PostCreate,
+    current_user: CurrentUser,
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
     result = await db.execute(Select(models.Post).where(models.Post.id == post_id))
@@ -63,18 +80,15 @@ async def update_full_post(
             detail="Post not found"
             )
 
-    if post_data.user_id != post.user_id:
-        result = await db.execute(Select(models.User).where(models.User.id == post_data.user_id))
-        user = result.scalar_one_or_none()
-        if not user:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="User not found"
+    if post.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, 
+            detail="You do not have permission to update this post"
             )
 
     post.title = post_data.title
     post.content = post_data.content
-    post.user_id = post_data.user_id
+    post.user_id = current_user.id
 
     await db.commit()
     await db.refresh(post, attribute_names=["author"])
@@ -84,6 +98,7 @@ async def update_full_post(
 async def update_partial_post(
     post_id: int, 
     post_data: PostUpdate,
+    current_user: CurrentUser,
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
     result = await db.execute(Select(models.Post).where(models.Post.id == post_id))
@@ -94,6 +109,12 @@ async def update_partial_post(
             detail="Post not found"
             )
 
+    if post.user_id != current_user.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN, 
+                detail="You do not have permission to update this post"
+                )
+
     update_data = post_data.model_dump(exclude_unset=True)
     for field, value in update_data.items():
         setattr(post, field, value)
@@ -102,30 +123,12 @@ async def update_partial_post(
     await db.refresh(post, attribute_names=["author"])
     return post
 
-@router.post("", response_model=PostResponse, status_code=status.HTTP_201_CREATED)
-async def create_post(post: PostCreate, db: Annotated[AsyncSession, Depends(get_db)]):
-    result = await db.execute(Select(models.User).where(models.User.id == post.user_id))
-    user = result.scalar_one_or_none()
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found"
-        )
-
-    new_post = models.Post(
-        title=post.title,
-        content=post.content,
-        user_id=post.user_id
-    )
-
-    db.add(new_post)
-    await db.commit()
-    await db.refresh(new_post, attribute_names=["author"])
-
-    return new_post
-
 @router.delete("/{post_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_post(post_id: int, db: Annotated[AsyncSession, Depends(get_db)]):
+async def delete_post(
+    post_id: int, 
+    current_user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)]
+):
     result = await db.execute(
         Select(models.Post)
         .where(models.Post.id == post_id)
@@ -135,6 +138,12 @@ async def delete_post(post_id: int, db: Annotated[AsyncSession, Depends(get_db)]
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, 
             detail="Post not found"
+            )
+
+    if post.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, 
+            detail="You do not have permission to delete this post"
             )
 
     await db.delete(post)
