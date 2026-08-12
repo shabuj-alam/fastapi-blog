@@ -4,10 +4,11 @@ from fastapi import (
     Depends, 
     APIRouter, 
     HTTPException, 
-    status
+    status,
+    Query
 )
 
-from sqlalchemy import Select
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -18,27 +19,49 @@ from database.database import (
 from database.posts_schema import (
     PostCreate, 
     PostResponse, 
-    PostUpdate
+    PostUpdate,
+    PaginatedPostsResponse
 )
 from auth.auth import CurrentUser
+from config import settings
 
 router = APIRouter()
 
 
-@router.get("", response_model=list[PostResponse])
-async def get_posts(db: Annotated[AsyncSession, Depends(get_db)]):
+@router.get("", response_model=PaginatedPostsResponse)
+async def get_posts(
+        db: Annotated[AsyncSession, Depends(get_db)],
+        skip: Annotated[int, Query(ge=0)] = 0,
+        limit: Annotated[int, Query(ge=1, le=100)] = settings.POST_LIMIT_PER_PAGE,
+    ):
+
+    count_result = await db.execute(select(func.count()).select_from(models.Post))
+    total = count_result.scalar() or 0
+
     result = await db.execute(
-        Select(models.Post)
+        select(models.Post)
         .options(selectinload(models.Post.author))
         .order_by(models.Post.date_posted.desc())
-        )
+        .offset(skip)
+        .limit(limit)
+    )
+    
     posts = result.scalars().all()
-    return posts
+
+    has_more = skip + len(posts) < total
+
+    return PaginatedPostsResponse(
+        posts=[PostResponse.model_validate(post) for post in posts],
+        total=total,
+        skip=skip,
+        limit=limit,
+        has_more=has_more,
+    )
 
 @router.get("/{post_id}", response_model=PostResponse)
 async def get_post(post_id: int, db: Annotated[AsyncSession, Depends(get_db)]):
     result = await db.execute(
-        Select(models.Post)
+        select(models.Post)
         .options(selectinload(models.Post.author))
         .where(models.Post.id == post_id)
     )
@@ -72,7 +95,7 @@ async def update_full_post(
     current_user: CurrentUser,
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
-    result = await db.execute(Select(models.Post).where(models.Post.id == post_id))
+    result = await db.execute(select(models.Post).where(models.Post.id == post_id))
     post = result.scalar_one_or_none()
     if post is None:
         raise HTTPException(
@@ -101,7 +124,7 @@ async def update_partial_post(
     current_user: CurrentUser,
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
-    result = await db.execute(Select(models.Post).where(models.Post.id == post_id))
+    result = await db.execute(select(models.Post).where(models.Post.id == post_id))
     post = result.scalar_one_or_none()
     if post is None:
         raise HTTPException(
@@ -130,7 +153,7 @@ async def delete_post(
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
     result = await db.execute(
-        Select(models.Post)
+        select(models.Post)
         .where(models.Post.id == post_id)
     )
     post = result.scalar_one_or_none()

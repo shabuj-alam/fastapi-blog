@@ -6,6 +6,7 @@ from fastapi import (
     HTTPException, 
     status,
     UploadFile,
+    Query
 )
 from fastapi.security import OAuth2PasswordRequestForm
 
@@ -18,7 +19,8 @@ from database.database import (
     get_db
 )
 from database.posts_schema import (
-    PostResponse
+    PostResponse,
+    PaginatedPostsResponse
 )
 from database.users_schema import (
     UserCreate, 
@@ -30,9 +32,9 @@ from database.users_schema import (
 
 from PIL import UnidentifiedImageError
 from starlette.concurrency import run_in_threadpool
+from config import settings
 
 from datetime import timedelta
-from config import settings
 
 from auth.auth import (
     CurrentUser,
@@ -189,8 +191,21 @@ async def update_user(
     await db.refresh(user)
     return user
 
-@router.get("/{user_id}/posts", response_model=list[PostResponse])
-async def get_user_posts(user_id: int, db: Annotated[AsyncSession, Depends(get_db)]):
+@router.get("/{user_id}/posts", response_model=PaginatedPostsResponse)
+async def get_user_posts(
+    user_id: int, 
+    db: Annotated[AsyncSession, Depends(get_db)],
+    skip: Annotated[int, Query(ge=0)] = 0,
+    limit: Annotated[int, Query(ge=1, le=100)] = settings.POST_LIMIT_PER_PAGE,
+    ):
+
+    count_result = await db.execute(
+        select(func.count())
+        .select_from(models.Post)
+        .where(models.Post.user_id == user_id)
+    )
+    total = count_result.scalar() or 0
+    
     result = await db.execute(select(models.User).where(models.User.id == user_id))
     user = result.scalar_one_or_none()
     if not user:
@@ -203,9 +218,20 @@ async def get_user_posts(user_id: int, db: Annotated[AsyncSession, Depends(get_d
         select(models.Post)
         .options(selectinload(models.Post.author))
         .where(models.Post.user_id == user_id)
+        .offset(skip)
+        .limit(limit)
     )
     posts = result.scalars().all()
-    return posts
+
+    has_more = skip + len(posts) < total
+
+    return PaginatedPostsResponse(
+        posts=[PostResponse.model_validate(post) for post in posts],
+        total=total,
+        skip=skip,
+        limit=limit,
+        has_more=has_more,
+    )
 
 @router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_user(user_id: int, current_user: CurrentUser, db: Annotated[AsyncSession, Depends(get_db)]):
