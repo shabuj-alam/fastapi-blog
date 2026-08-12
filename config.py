@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
 
     MAX_UPLOAD_SIZE_BYTES: int = 5 * 1024 * 1024  # 5 MB
-    
+
+    POST_LIMIT_PER_PAGE: int = 10 
 
 settings = Settings()
