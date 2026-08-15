@@ -84,23 +84,43 @@
   <!-- Password Reset Section (Placeholder) -->
   <div class="mb-4">
     <h5>Change Password</h5>
-    <p class="text-body-secondary">
-      Password reset coming in a future tutorial.
-    </p>
-    <form>
+    <form id="changePasswordForm">
       <div class="mb-3">
-        <label class="form-label">Current Password</label>
-        <input type="password" class="form-control" disabled />
+        <label for="currentPassword" class="form-label">Current Password</label>
+        <input
+          type="password"
+          class="form-control"
+          id="currentPassword"
+          name="current_password"
+          required
+        />
       </div>
       <div class="mb-3">
-        <label class="form-label">New Password</label>
-        <input type="password" class="form-control" disabled />
+        <label for="newPassword" class="form-label">New Password</label>
+        <input
+          type="password"
+          class="form-control"
+          id="newPassword"
+          name="new_password"
+          required
+          minlength="8"
+        />
+        <div class="form-text">Password must be at least 8 characters.</div>
       </div>
       <div class="mb-3">
-        <label class="form-label">Confirm New Password</label>
-        <input type="password" class="form-control" disabled />
+        <label for="confirmNewPassword" class="form-label"
+          >Confirm New Password</label
+        >
+        <input
+          type="password"
+          class="form-control"
+          id="confirmNewPassword"
+          name="confirm_new_password"
+          required
+          minlength="8"
+        />
       </div>
-      <button type="submit" class="btn btn-primary" disabled>
+      <button type="submit" class="btn btn-primary" id="changePasswordBtn">
         Change Password
       </button>
     </form>
@@ -205,32 +225,32 @@
   }
 
   // Image Preview Handler
-  const pictureInput = document.getElementById('pictureInput');
-  const imagePreview = document.getElementById('imagePreview');
-  const uploadBtn = document.getElementById('uploadPictureBtn');
+  const pictureInput = document.getElementById("pictureInput");
+  const imagePreview = document.getElementById("imagePreview");
+  const uploadBtn = document.getElementById("uploadPictureBtn");
 
-  pictureInput.addEventListener('change', (event) => {
+  pictureInput.addEventListener("change", (event) => {
     const file = event.target.files[0];
     if (file) {
       const reader = new FileReader();
       reader.onload = (e) => {
         imagePreview.src = e.target.result;
-        imagePreview.classList.remove('d-none');
+        imagePreview.classList.remove("d-none");
       };
       reader.readAsDataURL(file);
 
       uploadBtn.disabled = false;
     } else {
-      imagePreview.classList.add('d-none');
+      imagePreview.classList.add("d-none");
       uploadBtn.disabled = true;
     }
   });
 
   // Upload Profile Picture Handler
-  uploadBtn.addEventListener('click', async () => {
+  uploadBtn.addEventListener("click", async () => {
     const token = getToken();
     if (!token) {
-      window.location.href = '/login';
+      window.location.href = "/login";
       return;
     }
 
@@ -241,30 +261,30 @@
 
     // Use FormData for file uploads (not JSON)
     const formData = new FormData();
-    formData.append('file', file);
+    formData.append("file", file);
 
     uploadBtn.disabled = true;
-    uploadBtn.textContent = 'Uploading...';
+    uploadBtn.textContent = "Uploading...";
 
     try {
       const response = await fetch(`/api/users/${currentUserId}/picture`, {
-        method: 'PATCH',
+        method: "PATCH",
         headers: {
           // Don't set Content-Type — browser sets multipart boundary automatically
-          'Authorization': `Bearer ${token}`,
+          Authorization: `Bearer ${token}`,
         },
         body: formData,
       });
 
       if (response.status === 401) {
-        window.location.href = '/login';
+        window.location.href = "/login";
         return;
       }
 
       if (response.status === 403) {
-        document.getElementById('errorMessage').textContent =
-          'You are not authorized to update this profile picture.';
-        showModal('errorModal');
+        document.getElementById("errorMessage").textContent =
+          "You are not authorized to update this profile picture.";
+        showModal("errorModal");
         return;
       }
 
@@ -273,26 +293,27 @@
 
         clearUserCache();
 
-        document.getElementById('profileImage').src = data.image_path;
+        document.getElementById("profileImage").src = data.image_path;
 
-        pictureInput.value = '';
-        imagePreview.classList.add('d-none');
+        pictureInput.value = "";
+        imagePreview.classList.add("d-none");
 
-        document.getElementById('successMessage').textContent =
-          'Profile picture updated successfully!';
-        showModal('successModal');
+        document.getElementById("successMessage").textContent =
+          "Profile picture updated successfully!";
+        showModal("successModal");
       } else {
         const error = await response.json();
-        document.getElementById('errorMessage').textContent = getErrorMessage(error);
-        showModal('errorModal');
+        document.getElementById("errorMessage").textContent =
+          getErrorMessage(error);
+        showModal("errorModal");
       }
     } catch (error) {
-      document.getElementById('errorMessage').textContent =
-        'Network error. Please check your connection and try again.';
-      showModal('errorModal');
+      document.getElementById("errorMessage").textContent =
+        "Network error. Please check your connection and try again.";
+      showModal("errorModal");
     } finally {
       uploadBtn.disabled = pictureInput.files.length === 0;
-      uploadBtn.textContent = 'Upload';
+      uploadBtn.textContent = "Upload";
     }
   });
 
@@ -412,5 +433,76 @@
 
   // Load user data on page load
   loadUserData();
+
+  const changePasswordForm = document.getElementById("changePasswordForm");
+  const changePasswordBtn = document.getElementById("changePasswordBtn");
+
+  changePasswordForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+
+    const token = getToken();
+    if (!token) {
+      window.location.href = "/login";
+      return;
+    }
+
+    const currentPassword = document.getElementById("currentPassword").value;
+    const newPassword = document.getElementById("newPassword").value;
+    const confirmNewPassword =
+      document.getElementById("confirmNewPassword").value;
+
+    // Client-side password matching validation
+    if (newPassword !== confirmNewPassword) {
+      document.getElementById("errorMessage").textContent =
+        "New passwords do not match.";
+      showModal("errorModal");
+      return;
+    }
+
+    // Disable button during submission
+    changePasswordBtn.disabled = true;
+    changePasswordBtn.textContent = "Changing...";
+
+    try {
+      const response = await fetch("/api/users/me/password", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          current_password: currentPassword,
+          new_password: newPassword,
+        }),
+      });
+
+      if (response.status === 401) {
+        window.location.href = "/login";
+        return;
+      }
+
+      if (response.ok) {
+        // Clear form
+        changePasswordForm.reset();
+
+        document.getElementById("successMessage").textContent =
+          "Password changed successfully!";
+        showModal("successModal");
+      } else {
+        const error = await response.json();
+        document.getElementById("errorMessage").textContent =
+          getErrorMessage(error);
+        showModal("errorModal");
+      }
+    } catch (error) {
+      document.getElementById("errorMessage").textContent =
+        "Network error. Please check your connection and try again.";
+      showModal("errorModal");
+    } finally {
+      // Re-enable button
+      changePasswordBtn.disabled = false;
+      changePasswordBtn.textContent = "Change Password";
+    }
+  });
 </script>
 {% endblock scripts %}
