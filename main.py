@@ -25,7 +25,6 @@ from sqlalchemy.orm import selectinload
 
 from database import models
 from database.database import (
-    Base, 
     engine, 
     get_db
 )
@@ -39,9 +38,6 @@ from config import settings
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Create the database tables
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
     yield
     # Drop the database tables (optional, uncomment if needed)
     # async with engine.begin() as conn:
@@ -179,7 +175,6 @@ async def forgot_password_page(request: Request):
         "forgot_password.html",
         {"title": "Forgot Password"},
     )
-
 
 @app.get("/reset-password", include_in_schema=False)
 async def reset_password_page(request: Request):

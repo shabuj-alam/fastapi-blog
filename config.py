@@ -18,6 +18,8 @@ class Settings(BaseSettings):
 
     RESET_TOKEN_EXPIRE_MIN: int = 60
 
+    DATABASE_URL: str
+
     ## Email Configuration Settings
     mail_server: str = "localhost"
     mail_port: int = 587
